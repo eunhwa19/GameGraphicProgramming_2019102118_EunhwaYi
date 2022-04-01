@@ -30,43 +30,34 @@
 -----------------------------------------------------------------F-F*/
 INT WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLine, _In_ INT nCmdShow)
 {
-    /*--------------------------------------------------------------------
-      TODO: Unreferenced parameters (remove the comment)
-    --------------------------------------------------------------------*/
+    UNREFERENCED_PARAMETER(hPrevInstance);
+    UNREFERENCED_PARAMETER(lpCmdLine);
 
-    /*--------------------------------------------------------------------
-      TODO: Initialization (remove the comment)
-    --------------------------------------------------------------------*/
+    if (FAILED(library::InitWindow(hInstance, nCmdShow)))
+        return 0;
+
+    if (FAILED(library::InitDevice()))
+    {
+        library::CleanupDevice();
+        return 0;
+    }
 
     // Main message loop
-    
-    /*--------------------------------------------------------------------
-      TODO: Main message loop (remove the comment)
-    --------------------------------------------------------------------*/
-
-    /*--------------------------------------------------------------------
-      TODO: Destroy (remove the comment)
-    --------------------------------------------------------------------*/
-
     MSG msg = { 0 };
-    msg.message = WM_NULL;
-
     while (WM_QUIT != msg.message)
     {
-        // Process window events.
-        // Use PeekMessage() so we can use idle time to render the scene. 
-        
-        if (PeekMessage(&msg, NULL, 0U, 0U, PM_NOREMOVE))
+        if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
         {
-            // Translate and dispatch the message
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
         else
         {
-            Render();
+            library::Render();
         }
-
     }
 
+    library::CleanupDevice();
+
+    return (int)msg.wParam;
 }
