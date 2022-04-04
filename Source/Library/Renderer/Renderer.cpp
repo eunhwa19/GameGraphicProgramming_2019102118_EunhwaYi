@@ -4,11 +4,17 @@ namespace library
 {
     /*M+M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M
       Method:   Renderer::Renderer
+
       Summary:  Constructor
+
       Modifies: [m_driverType, m_featureLevel, m_d3dDevice, m_d3dDevice1,
                   m_immediateContext, m_immediateContext1, m_swapChain,
-                  m_swapChain1, m_renderTargetView].
+                  m_swapChain1, m_renderTargetView, m_vertexShader,
+                  m_pixelShader, m_vertexLayout, m_vertexBuffer].
     M---M---M---M---M---M---M---M---M---M---M---M---M---M---M---M---M-M*/
+    /*--------------------------------------------------------------------
+      TODO: Renderer::Renderer definition (remove the comment)
+    --------------------------------------------------------------------*/
     Renderer::Renderer()
         : m_driverType(D3D_DRIVER_TYPE_NULL)
         , m_featureLevel(D3D_FEATURE_LEVEL_11_0)
@@ -19,31 +25,40 @@ namespace library
         , m_swapChain(nullptr)
         , m_swapChain1(nullptr)
         , m_renderTargetView(nullptr)
+        , m_vertexShader(nullptr)
+        , m_pixelShader(nullptr)
+        , m_vertexLayout(nullptr)
+        , m_vertexBuffer(nullptr)
     { }
     /*M+M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M
       Method:   Renderer::Initialize
+
       Summary:  Creates Direct3D device and swap chain
+
       Args:     HWND hWnd
                   Handle to the window
+
       Modifies: [m_d3dDevice, m_featureLevel, m_immediateContext,
                   m_d3dDevice1, m_immediateContext1, m_swapChain1,
-                  m_swapChain, m_renderTargetView].
+                  m_swapChain, m_renderTargetView, m_vertexShader, 
+                  m_vertexLayout, m_pixelShader, m_vertexBuffer].
+
       Returns:  HRESULT
                   Status code
     M---M---M---M---M---M---M---M---M---M---M---M---M---M---M---M---M-M*/
+    /*--------------------------------------------------------------------
+      TODO: Renderer::Initialize definition (remove the comment)
+    --------------------------------------------------------------------*/
     HRESULT Renderer::Initialize(_In_ HWND hWnd)
     {
         HRESULT hr = S_OK;
 
         RECT rc;
         GetClientRect(hWnd, &rc);
-        UINT width = rc.right - rc.left;
-        UINT height = rc.bottom - rc.top;
+        UINT width = rc.right - static_cast<UINT>(rc.left);
+        UINT height = rc.bottom - static_cast<UINT>(rc.top);
 
         UINT createDeviceFlags = 0;
-#ifdef _DEBUG
-        createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
-#endif
 
         D3D_DRIVER_TYPE driverTypes[] =
         {
@@ -58,7 +73,7 @@ namespace library
             D3D_FEATURE_LEVEL_11_1,
             D3D_FEATURE_LEVEL_11_0,
             D3D_FEATURE_LEVEL_10_1,
-            D3D_FEATURE_LEVEL_10_0,
+            D3D_FEATURE_LEVEL_10_0
         };
         UINT numFeatureLevels = ARRAYSIZE(featureLevels);
 
@@ -70,6 +85,7 @@ namespace library
 
             if (hr == E_INVALIDARG)
             {
+                // DirectX 11.0 platforms will not recognize D3D_FEATURE_LEVEL_11_1 so we need to retry without it
                 hr = D3D11CreateDevice(nullptr, m_driverType, nullptr, createDeviceFlags, &featureLevels[1], numFeatureLevels - 1,
                     D3D11_SDK_VERSION, m_d3dDevice.GetAddressOf(), &m_featureLevel, m_immediateContext.GetAddressOf());
             }
@@ -81,17 +97,18 @@ namespace library
             return hr;
 
         // Obtain DXGI factory from device (since we used nullptr for pAdapter above)
-        ComPtr<IDXGIFactory1> dxgiFactory(nullptr);
+        ComPtr<IDXGIFactory1>           dxgiFactory(nullptr);
         {
-            ComPtr<IDXGIDevice> dxgiDevice(nullptr);
+            ComPtr<IDXGIDevice>           dxgiDevice(nullptr);
             hr = m_d3dDevice.As(&dxgiDevice);
             if (SUCCEEDED(hr))
             {
-                ComPtr<IDXGIAdapter> adapter(nullptr);
+                ComPtr<IDXGIAdapter>           adapter(nullptr);
+
                 hr = dxgiDevice->GetAdapter(adapter.GetAddressOf());
                 if (SUCCEEDED(hr))
                 {
-                    hr = adapter->GetParent(__uuidof(IDXGIFactory1), &dxgiFactory);
+                    hr = adapter->GetParent(__uuidof(IDXGIFactory1), (&dxgiFactory));
                 }
             }
         }
@@ -99,7 +116,7 @@ namespace library
             return hr;
 
         // Create swap chain
-        ComPtr<IDXGIFactory2> dxgiFactory2(nullptr);
+        ComPtr<IDXGIFactory2>           dxgiFactory2(nullptr);
         hr = dxgiFactory.As(&dxgiFactory2);
         if (dxgiFactory2)
         {
@@ -127,6 +144,7 @@ namespace library
         }
         else
         {
+            // DirectX 11.0 systems
             DXGI_SWAP_CHAIN_DESC sd = {};
             sd.BufferCount = 1;
             sd.BufferDesc.Width = width;
@@ -146,11 +164,13 @@ namespace library
         // Note this tutorial doesn't handle full-screen swapchains so we block the ALT+ENTER shortcut
         dxgiFactory->MakeWindowAssociation(hWnd, DXGI_MWA_NO_ALT_ENTER);
 
+
         if (FAILED(hr))
             return hr;
 
         // Create a render target view
-        ComPtr<ID3D11Texture2D> pBackBuffer(nullptr);
+        ComPtr<ID3D11Texture2D>           pBackBuffer(nullptr);
+
         hr = m_swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (&pBackBuffer));
         if (FAILED(hr))
             return hr;
@@ -172,15 +192,126 @@ namespace library
         m_immediateContext->RSSetViewports(1, &vp);
 
         return S_OK;
+
+        SimpleVertex aVertices[] =
+        {
+            { XMFLOAT3(0.0f, 0.5f, 0.5f) },
+            { XMFLOAT3(0.5f, -0.5f, 0.5f) },
+            { XMFLOAT3(-0.5f, -0.5f, 0.5f) },
+        };
+
+        D3D11_BUFFER_DESC bd = {};
+        bd.Usage = D3D11_USAGE_DEFAULT;
+        bd.ByteWidth = sizeof(SimpleVertex);
+        bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        bd.CPUAccessFlags = 0;
+        bd.BindFlags = 0;
+
+        D3D11_SUBRESOURCE_DATA initData = {};
+        initData.pSysMem = aVertices;
+        initData.SysMemPitch = 0; 
+        initData.SysMemSlicePitch = 0;
+
+        hr = m_d3dDevice->CreateBuffer(&bd, &initData, &m_vertexBuffer);
+        if (FAILED(hr))
+        {
+            return hr;
+        }
+
+        WORD aIndices[] =
+        {
+            0, 1, 2
+        };
+
+        D3D11_BUFFER_DESC bd;
+        bd.Usage = D3D11_USAGE_DEFAULT;
+        bd.ByteWidth = sizeof(WORD) * 3;
+        bd.BindFlags = D3D11_BIND_INDEX_BUFFER;
+        bd.CPUAccessFlags = 0;
+        bd.MiscFlags = 0;
+
+        D3D11_SUBRESOURCE_DATA initData;
+        initData.pSysMem = aIndices;
+        initData.SysMemPitch = 0;
+        initData.SysMemSlicePitch = 0;
+
+        hr = m_d3dDevice->CreateBuffer(&bd, &initData, &m_indexVertex);
+        if (FAILED(hr))
+        {
+            return hr;
+        }
+
+        D3D11_INPUT_ELEMENT_DESC aLayouts[] =
+        {
+            {   "POSITION",
+                0,
+                DXGI_FORMAT_R32G32B32_FLOAT,
+                0,
+                0,
+                D3D11_INPUT_PER_VERTEX_DATA,
+                0
+            },
+        };
+        UINT uNumElements = ARRAYSIZE(aLayouts);
+
+        hr = m_d3dDevice->CreateInputLayout(
+            aLayouts,
+            uNumElements,
+            vertexShaderBlob->GetBufferPointer(),
+            vertexShaderBlob->GetBufferSize(),
+            &m_vertexLayout
+        );
+
+        if (FAILED(hr))
+        {
+            return hr;
+        }
     }
+
     /*M+M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M
       Method:   Renderer::Render
+
       Summary:  Render the frame
     M---M---M---M---M---M---M---M---M---M---M---M---M---M---M---M---M-M*/
+    /*--------------------------------------------------------------------
+      TODO: Renderer::Render definition (remove the comment)
+    --------------------------------------------------------------------*/
     void Renderer::Render()
     {
         // Just clear the backbuffer
         m_immediateContext->ClearRenderTargetView(m_renderTargetView.Get(), Colors::MidnightBlue);
         m_swapChain->Present(0, 0);
+    }
+    /*M+M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M
+      Method:   Renderer::compileShaderFromFile
+
+      Summary:  Helper for compiling shaders with D3DCompile
+
+      Args:     PCWSTR pszFileName
+                  A pointer to a constant null-terminated string that
+                  contains the name of the file that contains the
+                  shader code
+                PCSTR pszEntryPoint
+                  A pointer to a constant null-terminated string that
+                  contains the name of the shader entry point function
+                  where shader execution begins
+                PCSTR pszShaderModel
+                  A pointer to a constant null-terminated string that
+                  specifies the shader target or set of shader
+                  features to compile against
+                ID3DBlob** ppBlobOut
+                  A pointer to a variable that receives a pointer to
+                  the ID3DBlob interface that you can use to access
+                  the compiled code
+
+      Returns:  HRESULT
+                  Status code
+    M---M---M---M---M---M---M---M---M---M---M---M---M---M---M---M---M-M*/
+    /*--------------------------------------------------------------------
+      TODO: Renderer::compileShaderFromFile definition (remove the comment)
+    --------------------------------------------------------------------*/
+    HRESULT Renderer::compileShaderFromFile(_In_ PCWSTR pszFileName, _In_ PCSTR pszEntryPoint, _In_ PCSTR szShaderModel, _Outptr_ ID3DBlob** ppBlobOut) 
+    {
+
     }
 }
